@@ -99,15 +99,15 @@ fn camera_control(
     let local_forward = transform.rotation * -Vec3::Z;
     let local_right = transform.rotation * Vec3::X;
 
-    // Project onto horizontal plane for ground-relative movement
-    let forward_horizontal = Vec3::new(local_forward.x, 0.0, local_forward.z).normalize();
+    // Project right onto horizontal plane for strafing (A/D stay horizontal)
     let right_horizontal = Vec3::new(local_right.x, 0.0, local_right.z).normalize();
 
+    // W/S move in the direction the camera is actually looking (includes pitch)
     if key_input.pressed(KeyCode::KeyW) {
-        velocity += forward_horizontal;
+        velocity += local_forward;
     }
     if key_input.pressed(KeyCode::KeyS) {
-        velocity -= forward_horizontal;
+        velocity -= local_forward;
     }
     if key_input.pressed(KeyCode::KeyA) {
         velocity -= right_horizontal;

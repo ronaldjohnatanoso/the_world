@@ -13,7 +13,15 @@ use bevy::ui::PositionType;
 #[derive(Resource, Default)]
 pub struct EditorOverlayState {
     pub show_grid: bool,
+    pub show_axes: bool,
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MARKER - Coordinate Display UI Node
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[derive(Component)]
+pub struct CoordinateDisplay;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PLUGIN
@@ -42,7 +50,7 @@ impl bevy::app::Plugin for EditorOverlayPlugin {
         });
 
         app.init_resource::<EditorOverlayState>()
-            .add_systems(Update, (draw_grid_gizmo, draw_axis_gizmo));
+            .add_systems(Update, (draw_grid_gizmo, draw_axis_gizmo, update_coordinate_display));
     }
 }
 
@@ -124,6 +132,14 @@ fn toggle_grid(
     info!("Grid toggled: {}", state.show_grid);
 }
 
+fn toggle_axes(
+    _click: On<Pointer<Click>>,
+    mut state: ResMut<EditorOverlayState>,
+) {
+    state.show_axes = !state.show_axes;
+    info!("Axes toggled: {}", state.show_axes);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SPAWN HELPER - Creates the editor overlay UI
 // ─────────────────────────────────────────────────────────────────────────────
@@ -174,6 +190,47 @@ pub fn spawn_editor_overlay(mut commands: Commands) {
                     ));
                 })
                 .observe(toggle_grid);
+
+            // ── Axes Toggle Button ───────────────────────────────────────────
+            parent
+                .spawn((
+                    Button,
+                    Node {
+                        width: px(120.0),
+                        height: px(32.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        padding: UiRect::all(px(4.0)),
+                        border: UiRect::all(px(1.0)),
+                        border_radius: BorderRadius::all(px(4.0)),
+                        ..default()
+                    },
+                    BorderColor::all(Color::srgb(0.3, 0.3, 0.3)),
+                    BackgroundColor(Color::srgb(0.4, 0.4, 0.4)),
+                ))
+                .with_children(|btn_child| {
+                    btn_child.spawn((
+                        Text::new("Toggle Axes"),
+                        TextFont {
+                            font_size: 12.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                    ));
+                })
+                .observe(toggle_axes);
+
+            // ── Coordinate Display ───────────────────────────────────────────
+            parent
+                .spawn((
+                    CoordinateDisplay,
+                    Text::new("X: 0.00  Y: 0.00  Z: 0.00"),
+                    TextFont {
+                        font_size: 14.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                ));
         });
 }
 
@@ -182,17 +239,41 @@ pub fn spawn_editor_overlay(mut commands: Commands) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn draw_axis_gizmo(
+    state: Res<EditorOverlayState>,
     mut gizmos: Gizmos,
 ) {
+    if !state.show_axes {
+        return;
+    }
+
     let origin = Vec3::ZERO;
-    let length = 2.0;
+    let length = 5.0;
 
-    // X axis - Red (positive X direction)
-    gizmos.line(origin, Vec3::new(length, 0.0, 0.0), Color::srgb(0.9, 0.2, 0.2));
+    // X axis - Bright Red (positive X direction)
+    gizmos.line(origin, Vec3::new(length, 0.0, 0.0), Color::srgb(1.0, 0.0, 0.0));
 
-    // Y axis - Green (positive Y direction)
-    gizmos.line(origin, Vec3::new(0.0, length, 0.0), Color::srgb(0.2, 0.9, 0.2));
+    // Y axis - Bright Green (positive Y direction)
+    gizmos.line(origin, Vec3::new(0.0, length, 0.0), Color::srgb(0.0, 1.0, 0.0));
 
-    // Z axis - Blue (positive Z direction)
-    gizmos.line(origin, Vec3::new(0.0, 0.0, length), Color::srgb(0.2, 0.4, 0.9));
+    // Z axis - Bright Blue (positive Z direction)
+    gizmos.line(origin, Vec3::new(0.0, 0.0, length), Color::srgb(0.0, 0.3, 1.0));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SYSTEM - Update Coordinate Display
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn update_coordinate_display(
+    camera_query: Query<&Transform, With<Camera3d>>,
+    mut coord_text: Query<&mut Text, With<CoordinateDisplay>>,
+) {
+    let Ok(transform) = camera_query.single() else {
+        return;
+    };
+    let Ok(mut text) = coord_text.single_mut() else {
+        return;
+    };
+
+    let pos = transform.translation;
+    text.0 = format!("X: {:.2}  Y: {:.2}  Z: {:.2}", pos.x, pos.y, pos.z);
 }

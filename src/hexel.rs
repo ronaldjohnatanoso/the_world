@@ -3,7 +3,11 @@
 //! A hexel is a hexagonal prism with 6-bit collapse masks (64 states).
 //! This module defines the hexel geometry and mesh generation.
 
-use bevy::prelude::*;
+use bevy::{
+    asset::RenderAssetUsages,
+    mesh::{Indices, PrimitiveTopology},
+    prelude::*,
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
@@ -48,93 +52,91 @@ pub fn create_hexel_mesh() -> Mesh {
     let hex_2d = hexagon_vertices(radius);
     let half_height = height / 2.0;
 
-    let mut positions: Vec<Vec3> = Vec::new();
-    let mut normals: Vec<Vec3> = Vec::new();
+    let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut normals: Vec<[f32; 3]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
 
-    // Center vertices for bottom and top faces
-    let bottom_center_idx = 0u32;
-    positions.push(Vec3::new(0.0, 0.0, -half_height));
-    normals.push(Vec3::NEG_Z);
+    // Build the hex prism as triangles (not quads)
 
-    let top_center_idx = (HEXAGON_SIDES + 1) as u32;
-    positions.push(Vec3::new(0.0, 0.0, half_height));
-    normals.push(Vec3::Z);
+    // Top face - triangle fan (pointing up +Z)
+    // Center vertex
+    positions.push([0.0, 0.0, half_height]);
+    normals.push([0.0, 0.0, 1.0]);
 
-    // Bottom ring vertices
+    // Ring vertices (CCW when viewed from above)
     for v in &hex_2d {
-        positions.push(Vec3::new(v.x, v.y, -half_height));
-        normals.push(Vec3::NEG_Z);
+        positions.push([v.x, v.y, half_height]);
+        normals.push([0.0, 0.0, 1.0]);
     }
 
-    // Top ring vertices
+    // Top face triangles (fan from center)
+    for i in 0..HEXAGON_SIDES {
+        let center = 0u32;
+        let i0 = (1 + i) as u32;
+        let i1 = (1 + (i + 1) % HEXAGON_SIDES) as u32;
+        indices.push(center);
+        indices.push(i0);
+        indices.push(i1);
+    }
+
+    // Bottom face - triangle fan (pointing down -Z)
+    // Center vertex
+    positions.push([0.0, 0.0, -half_height]);
+    normals.push([0.0, 0.0, -1.0]);
+
+    // Ring vertices (CW when viewed from below - reversed winding for correct normals)
     for v in &hex_2d {
-        positions.push(Vec3::new(v.x, v.y, half_height));
-        normals.push(Vec3::Z);
+        positions.push([v.x, v.y, -half_height]);
+        normals.push([0.0, 0.0, -1.0]);
     }
 
-    // Bottom face (fan from center)
+    let bottom_center_idx = (HEXAGON_SIDES + 2) as u32;
+    let bottom_ring_start = bottom_center_idx + 1;
+
+    // Bottom face triangles (fan from center, reversed winding)
     for i in 0..HEXAGON_SIDES {
-        let i0 = 1 + i;
-        let i1 = 1 + (i + 1) % HEXAGON_SIDES;
-        indices.push(bottom_center_idx);
-        indices.push(i0 as u32);
-        indices.push(i1 as u32);
+        let center = bottom_center_idx;
+        let i0 = bottom_ring_start + i as u32;
+        let i1 = bottom_ring_start + ((i + 1) % HEXAGON_SIDES) as u32;
+        indices.push(center);
+        indices.push(i1); // Reversed!
+        indices.push(i0);
     }
 
-    // Top face (fan from center, reversed winding)
+    // Side faces - 2 triangles per side
     for i in 0..HEXAGON_SIDES {
-        let i0 = 1 + HEXAGON_SIDES + i;
-        let i1 = 1 + HEXAGON_SIDES + (i + 1) % HEXAGON_SIDES;
-        indices.push(top_center_idx);
-        indices.push(i1 as u32);
-        indices.push(i0 as u32);
-    }
-
-    // Side faces
-    for i in 0..HEXAGON_SIDES {
-        let bi0 = 1 + i;
-        let bi1 = 1 + (i + 1) % HEXAGON_SIDES;
-        let ti0 = 1 + HEXAGON_SIDES + i;
-        let ti1 = 1 + HEXAGON_SIDES + (i + 1) % HEXAGON_SIDES;
-
-        // Compute outward normal for this side
         let v0 = hex_2d[i];
         let v1 = hex_2d[(i + 1) % HEXAGON_SIDES];
-        let edge_mid = (v0 + v1) / 2.0;
-        let normal = Vec3::new(edge_mid.x, edge_mid.y, 0.0).normalize();
 
-        // Add 4 vertices for this side quad
+        // Compute outward normal for this side (in XY plane, pointing away from center)
+        let normal = Vec3::new(v0.x + v1.x, v0.y + v1.y, 0.0).normalize();
+
         let base_idx = positions.len() as u32;
 
-        let bottom_i = Vec3::new(v0.x, v0.y, -half_height);
-        let bottom_ip1 = Vec3::new(v1.x, v1.y, -half_height);
-        let top_ip1 = Vec3::new(v1.x, v1.y, half_height);
-        let top_i = Vec3::new(v0.x, v0.y, half_height);
+        // 4 vertices of the side quad
+        // Bottom-left, bottom-right, top-right, top-left (when viewed from outside)
+        positions.push([v0.x, v0.y, -half_height]); // 0: bottom i
+        normals.push([normal.x, normal.y, normal.z]);
+        positions.push([v1.x, v1.y, -half_height]); // 1: bottom i+1
+        normals.push([normal.x, normal.y, normal.z]);
+        positions.push([v1.x, v1.y, half_height]); // 2: top i+1
+        normals.push([normal.x, normal.y, normal.z]);
+        positions.push([v0.x, v0.y, half_height]); // 3: top i
+        normals.push([normal.x, normal.y, normal.z]);
 
-        positions.push(bottom_i);
-        normals.push(normal);
-        positions.push(bottom_ip1);
-        normals.push(normal);
-        positions.push(top_ip1);
-        normals.push(normal);
-        positions.push(top_i);
-        normals.push(normal);
-
-        // Two triangles for quad
+        // Two triangles for this quad (CCW when viewed from outside)
         indices.push(base_idx);
         indices.push(base_idx + 1);
         indices.push(base_idx + 2);
+
         indices.push(base_idx);
         indices.push(base_idx + 2);
         indices.push(base_idx + 3);
     }
 
-    // Create mesh using Mesh::from()
-    let mut mesh = Mesh::new(bevy::render::mesh::PrimitiveTopology::TriangleList);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.set_indices(bevy::render::mesh::Indices::U32(indices));
-
-    mesh
+    // Create mesh
+    Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+        .with_inserted_indices(Indices::U32(indices))
 }
