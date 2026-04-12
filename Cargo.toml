@@ -1,0 +1,23 @@
+[package]
+name = "the_world"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = "0.18"
+wgpu = "27"
+pollster = "0.4"
+bytemuck = "1"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = true
+
+[alias]
+# Run with hot reload: cargo watch -x run
+dev = "run"
+watch = "watch -x run"

@@ -1,0 +1,25 @@
+# Build output
+/target/
+
+# Claude Code internal files
+/.claude/
+
+# Memory system
+/memory/
+
+# Generated docs (if any)
+/docs/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Windows debug symbols
+*.pdb
