@@ -5,20 +5,37 @@
 
 mod camera;
 mod editor;
+mod hexel;
 
 use bevy::prelude::*;
 use camera::{setup_camera, CameraPlugin};
 use editor::{spawn_editor_overlay, EditorOverlayPlugin};
+use hexel::create_hexel_mesh;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(CameraPlugin)
-        .add_plugins(EditorOverlayPlugin)
+    let mut app = App::new();
+
+    // Configure window for higher FPS (disable vsync) and fullscreen
+    app.add_plugins(
+        DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "The World".to_string(),
+                present_mode: bevy::window::PresentMode::Immediate,
+                mode: bevy::window::WindowMode::BorderlessFullscreen(
+                    bevy::window::MonitorSelection::Primary,
+                ),
+                resolution: bevy::window::WindowResolution::new(1920.0 as u32, 1080.0 as u32),
+                ..default()
+            }),
+            ..default()
+        }),
+    );
+
+    app.add_plugins((CameraPlugin, EditorOverlayPlugin))
         .add_systems(Startup, setup)
         .run();
 }
@@ -28,28 +45,21 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // ── Cube Mesh ────────────────────────────────────────────────────────────
-    let mesh = Mesh::from(Cuboid::from_size(Vec3::splat(2.0))); // 2x2x2 cube
+    // ── Single Hexel ────────────────────────────────────────────────────────
+    let hexel_mesh = create_hexel_mesh();
 
     commands.spawn((
-        Mesh3d(meshes.add(mesh)),
+        Mesh3d(meshes.add(hexel_mesh)),
         MeshMaterial3d(materials.add(Color::srgb(0.8, 0.2, 0.2))),
         Transform::from_xyz(0.0, 0.0, 0.0),
     ));
 
-    // ── Ground Plane ─────────────────────────────────────────────────────────
-    let ground_mesh = Mesh::from(Plane3d::default().mesh().size(20.0, 20.0));
-    commands.spawn((
-        Mesh3d(meshes.add(ground_mesh)),
-        MeshMaterial3d(materials.add(Color::srgb(0.2, 0.8, 0.2))), // green ground
-        Transform::from_xyz(0.0, -1.0, 0.0),                          // below the cube
-    ));
-
     // ── Camera ───────────────────────────────────────────────────────────────
+    // Position to see the hexel from isometric-ish angle
     setup_camera(
         &mut commands,
-        Vec3::new(0.0, 2.0, 8.0), // further back to see the whole cube
-        Vec3::ZERO,               // looking at origin
+        Vec3::new(4.0, 4.0, 6.0), // angled view to see hexel shape
+        Vec3::ZERO,                  // looking at origin
     );
 
     // ── Light ──────────────────────────────────────────────────────────────
@@ -59,6 +69,14 @@ fn setup(
             ..default()
         },
         Transform::from_xyz(4.0, 5.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
+
+    // Add ambient light so we can see all faces
+    commands.spawn((
+        AmbientLight {
+            brightness: 0.3,
+            ..default()
+        },
     ));
 
     // ── Editor Overlay UI ──────────────────────────────────────────────────

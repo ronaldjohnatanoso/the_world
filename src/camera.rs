@@ -1,6 +1,6 @@
-//! Camera module - WASD + scroll zoom + click-hold pan camera
+//! Camera module - FPS-style controllable camera
 //!
-//! Provides camera controls: WASD movement, scroll to zoom, click-hold to pan.
+//! Provides camera controls: WASD + mouse look (on click-hold), scroll zoom.
 
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::prelude::*;
@@ -9,26 +9,32 @@ use bevy::prelude::*;
 // COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Camera controller: WASD + scroll zoom + click-hold pan
+/// Camera controller: WASD movement + mouse look (on click-hold) + scroll zoom
 #[derive(Component)]
 pub struct CameraController {
     /// Movement speed in units per second
     pub move_speed: f32,
     /// Scroll zoom sensitivity
     pub zoom_speed: f32,
-    /// Pan speed when mouse button is held
-    pub pan_speed: f32,
-    /// Is the left mouse button currently held for panning
-    is_panning: bool,
+    /// Mouse sensitivity for look
+    pub mouse_sensitivity: f32,
+    /// Is mouse look active (right button held)
+    is_looking: bool,
+    /// Pitch angle (up/down look) in radians
+    pitch: f32,
+    /// Yaw angle (left/right look) in radians
+    yaw: f32,
 }
 
 impl Default for CameraController {
     fn default() -> Self {
         Self {
             move_speed: 5.0,
-            zoom_speed: 10.0,
-            pan_speed: 0.05,
-            is_panning: false,
+            zoom_speed: 30.0,
+            mouse_sensitivity: 0.002,
+            is_looking: false,
+            pitch: 0.0,
+            yaw: 0.0,
         }
     }
 }
@@ -50,7 +56,7 @@ impl bevy::app::Plugin for CameraPlugin {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Camera control system - runs every frame
-/// WASD movement, scroll to zoom, click-hold to pan
+/// WASD movement, mouse look (when right button held), scroll to zoom
 fn camera_control(
     mut camera_query: Query<(&mut Transform, &mut CameraController), With<Camera3d>>,
     key_input: Res<ButtonInput<KeyCode>>,
@@ -62,6 +68,29 @@ fn camera_control(
     let Ok((mut transform, mut controller)) = camera_query.single_mut() else {
         return;
     };
+
+    // ── Mouse Look (only when right button held) ───────────────────────────
+    // Update looking state
+    if mouse_input.just_pressed(MouseButton::Right) {
+        controller.is_looking = true;
+    } else if mouse_input.just_released(MouseButton::Right) {
+        controller.is_looking = false;
+    }
+
+    // Apply mouse look if looking
+    if controller.is_looking {
+        let mouse_delta = mouse_motion.delta;
+
+        controller.yaw -= mouse_delta.x * controller.mouse_sensitivity;
+        controller.pitch -= mouse_delta.y * controller.mouse_sensitivity;
+
+        // Clamp pitch to prevent flipping
+        controller.pitch = controller.pitch.clamp(-1.54, 1.54);
+    }
+
+    // Apply rotation using Euler angles (YXZ order for FPS-style)
+    transform.rotation =
+        Quat::from_euler(bevy::math::EulerRot::YXZ, controller.yaw, controller.pitch, 0.0);
 
     // ── WASD Movement ─────────────────────────────────────────────────────
     let mut velocity = Vec3::ZERO;
@@ -95,31 +124,10 @@ fn camera_control(
 
     // ── Scroll Zoom ────────────────────────────────────────────────────────
     let zoom_delta = scroll.delta.y * controller.zoom_speed * time.delta_secs();
-    if zoom_delta != 0.0 {
+    if zoom_delta.abs() > 0.001 {
         // Move along the camera's local Z axis (forward/backward)
         let zoom_vector = transform.rotation * Vec3::Z * -zoom_delta;
         transform.translation += zoom_vector;
-    }
-
-    // ── Click-Hold Pan ────────────────────────────────────────────────────
-    // Detect pan start/end
-    if mouse_input.just_pressed(MouseButton::Left) {
-        controller.is_panning = true;
-    } else if mouse_input.just_released(MouseButton::Left) {
-        controller.is_panning = false;
-    }
-
-    // Pan when holding left mouse button
-    if controller.is_panning {
-        let mouse_delta = mouse_motion.delta;
-        let pan_x = -mouse_delta.x * controller.pan_speed;
-        let pan_y = mouse_delta.y * controller.pan_speed;
-
-        // Pan in camera's local X/Y plane (horizontal and vertical relative to view)
-        let pan_right = transform.rotation * Vec3::X * pan_x;
-        let pan_up = transform.rotation * Vec3::Y * pan_y;
-
-        transform.translation += pan_right + pan_up;
     }
 }
 
