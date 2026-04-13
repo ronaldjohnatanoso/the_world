@@ -2,9 +2,10 @@
 name = "the_world"
 version = "0.1.0"
 edition = "2021"
+default-run = "the_world"
 
 [dependencies]
-bevy = { version = "0.18", features = ["bevy_dev_tools"] }
+bevy = { version = "0.18", features = ["bevy_dev_tools", "experimental_bevy_ui_widgets"] }
 
 [profile.dev]
 opt-level = 0
