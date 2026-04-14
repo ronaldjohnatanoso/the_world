@@ -92,7 +92,7 @@ fn camera_control(
     transform.rotation =
         Quat::from_euler(bevy::math::EulerRot::YXZ, controller.yaw, controller.pitch, 0.0);
 
-    // ── WASD Movement ─────────────────────────────────────────────────────
+    // ── WASD Movement (camera-relative) ──────────────────────────────────
     let mut velocity = Vec3::ZERO;
 
     // Get camera's local axes (camera faces -Z by default)
@@ -114,6 +114,22 @@ fn camera_control(
     }
     if key_input.pressed(KeyCode::KeyD) {
         velocity += right_horizontal;
+    }
+
+    // ── Arrow Keys (absolute cardinal directions) ─────────────────────────
+    // Up/Down = world Y axis
+    if key_input.pressed(KeyCode::ArrowUp) {
+        velocity += Vec3::NEG_Y;
+    }
+    if key_input.pressed(KeyCode::ArrowDown) {
+        velocity += Vec3::Y;
+    }
+    // Left/Right = world X axis (not camera-relative)
+    if key_input.pressed(KeyCode::ArrowLeft) {
+        velocity += Vec3::NEG_X;
+    }
+    if key_input.pressed(KeyCode::ArrowRight) {
+        velocity += Vec3::X;
     }
 
     // Normalize and apply movement

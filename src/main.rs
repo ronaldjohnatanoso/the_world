@@ -81,7 +81,7 @@ fn spawn_sphere(
 ) -> Entity {
     let mesh = if golfball {
         let (verts, faces) = subdivide_icosahedron(level);
-        create_hexel_sphere_mesh(&verts, &faces, 0.005, level)
+        create_hexel_sphere_mesh(level)
     } else {
         create_subdivided_mesh(level)
     };
