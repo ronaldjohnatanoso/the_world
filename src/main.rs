@@ -80,7 +80,7 @@ fn spawn_sphere(
     golfball: bool,
 ) -> Entity {
     let mesh = if golfball {
-        let (verts, faces) = subdivide_icosahedron(level);
+        let (_verts, _faces) = subdivide_icosahedron(level);
         create_hexel_sphere_mesh(level)
     } else {
         create_subdivided_mesh(level)
@@ -89,12 +89,16 @@ fn spawn_sphere(
     let color = if golfball {
         Color::srgb(0.85, 0.85, 0.85) // Golfball white-ish
     } else {
-        Color::srgb(0.4, 0.5, 0.6) // Subdivided sphere blue-ish
+        Color::srgb(0.8, 0.8, 0.9) // Subdivided sphere brighter blue-ish
     };
 
     commands.spawn((
         Mesh3d(meshes.add(mesh)),
-        MeshMaterial3d(materials.add(color)),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: color,
+            unlit: true,
+            ..default()
+        })),
         Transform::from_xyz(0.0, 0.0, 0.0),
     )).id()
 }
@@ -117,22 +121,24 @@ fn setup(
     // ── Camera ───────────────────────────────────────────────────────────────
     setup_camera(
         &mut commands,
-        Vec3::new(4.0, 4.0, 6.0),
+        Vec3::new(0.87, 0.82, 6.29),
         Vec3::ZERO,
     );
 
     // ── Light ──────────────────────────────────────────────────────────────
+    // Maxed out lighting like Unreal Engine default — everything visible
     commands.spawn((
         PointLight {
-            shadows_enabled: true,
+            intensity: 100000.0,
+            shadows_enabled: false,
             ..default()
         },
-        Transform::from_xyz(4.0, 5.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(0.0, 0.0, 0.0),
     ));
 
     commands.spawn((
         AmbientLight {
-            brightness: 0.3,
+            brightness: 1.0,
             ..default()
         },
     ));

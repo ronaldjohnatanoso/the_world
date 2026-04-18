@@ -7,7 +7,7 @@ use bevy::prelude::*;
 use crate::subdivision::subdivide_icosahedron;
 
 /// Wireframe line color — bright enough to see on sphere
-const WIREFRAME_COLOR: Color = Color::srgb(0.7, 0.7, 0.7);
+const WIREFRAME_COLOR: Color = Color::srgb(0.0, 0.0, 0.0);
 
 /// Draws all edges of the subdivided triangular mesh as a wireframe.
 /// The hexel cell boundaries are visible as the lines that form groups of 3
